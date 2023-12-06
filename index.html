@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural Planets</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="x-shader/x-vertex" id="planet-vert-shader">
+      attribute float noise;
+
+      varying vec3 fragPosition;
+      varying vec3 fragNormal;
+      varying float fragNoise;
+
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+        fragPosition = position;
+        fragNormal = normalMatrix * normal;
+        fragNoise = noise;
+      }
+    </script>
+    <script type="x-shader/x-fragment" id="planet-frag-shader">
+      uniform vec3 oceanColor;
+      uniform vec3 beachColor;
+      uniform vec3 landColor;
+      uniform vec3 mountainColor;
+      uniform vec3 thresholds;
+      uniform vec3 transitions;
+
+      uniform vec3 lightDir;
+
+      varying vec3 fragPosition;
+      varying vec3 fragNormal;
+      varying float fragNoise;
+
+      void main() {
+        float light = dot(fragNormal, lightDir);
+
+        vec3 grassToMountains = mix(
+          landColor, 
+          mountainColor, 
+          smoothstep(
+            thresholds.z - transitions.z, 
+            thresholds.z + transitions.z, 
+            fragNoise
+        ));
+
+        vec3 sandToGrass = mix(
+          beachColor, 
+          grassToMountains, 
+          smoothstep(
+            thresholds.y - transitions.y, 
+            thresholds.y + transitions.y, 
+            fragNoise
+        ));
+
+        gl_FragColor = vec4(mix(
+          oceanColor, 
+          sandToGrass, 
+          smoothstep(
+            thresholds.x - transitions.x, 
+            thresholds.x + transitions.x, 
+            fragNoise)), 1.0);
+        gl_FragColor.rgb *= light;
+      }
+          </script>
+    <script type="module" src="/scripts/main.js"></script>
+  </body>
+</html>
