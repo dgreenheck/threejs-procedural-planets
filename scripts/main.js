@@ -6,18 +6,19 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SAOPass } from 'three/addons/postprocessing/SAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { PlanetGeometry } from './planetGeometry.js';
 
 window.onload = () => loadScene();
 
 const uniforms = {
+  seed: { value: 0 },
   radius: { value: 20.0 },
-  n_amplitude: { value: 3 },
-  n_scale: { value: 18 },
-  n_persistence: { value: 0.5 },
-  n_lacunarity: { value: 2 },
-  n_octaves: { value: 7 },
+  amplitude: { value: 0.5 },
+  period: { value: 1 },
+  persistence: { value: 0.5 },
+  lacunarity: { value: 2 },
+  octaves: { value: 7 },
   lightDir: { value: new THREE.Vector3(1, 1, 1) },
+  bumpStrength: { value: 1.0 },
   oceanColor: { value: new THREE.Color(0x206090) },
   beachColor: { value: new THREE.Color(0xecddd5) },
   landColor: { value: new THREE.Color(0x5fa134) },
@@ -36,22 +37,14 @@ function loadUI(planet, saoPass, bloomPass) {
 
   const geometryFolder = gui.addFolder('Geometry');
   geometryFolder.add(uniforms.radius, 'value', 1, 20).name('Radius');
-  geometryFolder.add(segments, 'phi', 3, 128, 1).name('Phi Segments');
-  geometryFolder.add(segments, 'theta', 3, 128, 1).name('Theta Segments');
-  geometryFolder.onChange(() => {
-    planet.geometry = new PlanetGeometry(
-      uniforms.radius.value, 
-      segments.phi, 
-      segments.theta,
-      uniforms);
-  });
 
   const noiseFolder = geometryFolder.addFolder('Noise');
-  noiseFolder.add(uniforms.n_amplitude, 'value', 0, 5).name('Amplitude');
-  noiseFolder.add(uniforms.n_scale, 'value', 1, 100).name('Scale');
-  noiseFolder.add(uniforms.n_persistence, 'value', 0, 1).name('Persistence');
-  noiseFolder.add(uniforms.n_lacunarity, 'value', 1, 5).name('Lacunarity');
-  noiseFolder.add(uniforms.n_octaves, 'value', 1, 8, 1).name('Octaves');
+  noiseFolder.add(uniforms.bumpStrength, 'value', 0, 1).name('Bump Strength');
+  noiseFolder.add(uniforms.amplitude, 'value', 0, 5).name('Amplitude');
+  noiseFolder.add(uniforms.period, 'value', 0.1, 10).name('Period');
+  noiseFolder.add(uniforms.persistence, 'value', 0, 1).name('Persistence');
+  noiseFolder.add(uniforms.lacunarity, 'value', 1, 5).name('Lacunarity');
+  noiseFolder.add(uniforms.octaves, 'value', 1, 8, 1).name('Octaves');
 
   const colorsFolder = gui.addFolder('Colors');
   const waterFolder = colorsFolder.addFolder('Ocean');
@@ -115,7 +108,6 @@ function loadScene() {
   console.log('loading scene');
 
   const renderer = new THREE.WebGLRenderer();
-  renderer.shadowMap.enabled = true;
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -125,9 +117,10 @@ function loadScene() {
   const controls = new OrbitControls(camera, renderer.domElement);
 
   const light = new THREE.DirectionalLight(0xffffff, 2);
-  light.position.set(1, 1, 1);
-  light.castShadow = true;
+  light.position.set(25, 25, 25);
+  
   scene.add(light);
+  scene.add(new THREE.DirectionalLightHelper(light, 25));
 
   camera.position.z = 50;
 
@@ -162,21 +155,12 @@ function loadScene() {
     fragmentShader
   });
 
-  const planet = new THREE.Mesh();
-  planet.material = material;
-  planet.geometry = new PlanetGeometry(
-    uniforms.radius.value, 
-    segments.phi, 
-    segments.theta,
-    uniforms);
-  planet.receiveShadow = true;
-  planet.castShadow = true;
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(1, segments.theta, segments.phi), material);
+  planet.geometry.computeTangents();
   scene.add(planet);
 
   function animate() {
     requestAnimationFrame(animate);
-
-    planet.rotation.y += 0.002;
 
     composer.render();
   }
