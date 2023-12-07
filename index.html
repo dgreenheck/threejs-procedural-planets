@@ -18,6 +18,7 @@
       uniform float radius;
 
       uniform float bumpStrength;
+      uniform float bumpOffset;
       uniform float amplitude;
       uniform float period;
       uniform float persistence;
@@ -29,8 +30,6 @@
       varying vec3 fragTangent;
       varying vec3 fragBitangent;
 
-      // Magnitude of offset used for calculating tangent vectors
-      const float delta = 0.001;
       const float PI = 3.14159265;
 
       //	Simplex 3D Noise 
@@ -134,7 +133,7 @@
         fragTangent = tangent;
         fragBitangent = cross(normal, tangent);
       }
-    </script>
+  </script>
 
   <script type="x-shader/x-fragment" id="planet-frag-shader">
       uniform float seed;
@@ -154,15 +153,17 @@
       uniform vec3 transitions;
 
       uniform float bumpStrength;
-      uniform vec3 lightDir;
+      uniform float bumpOffset;
+
+      uniform vec3 sunDirection;
+      uniform vec3 sunColor;
+      uniform float sunIntensity;
 
       varying vec3 fragPosition;
       varying vec3 fragNormal;
       varying vec3 fragTangent;
       varying vec3 fragBitangent;
 
-      // Magnitude of offset used for calculating tangent vectors
-      const float delta = 0.001;
       const float PI = 3.14159265;
 
       //	Simplex 3D Noise 
@@ -258,18 +259,16 @@
 
       void main() {
         float n = amplitude * fnoise(fragPosition);
-        float n_dx = amplitude * fnoise(fragPosition + (delta * fragTangent));
-        float n_dy = amplitude * fnoise(fragPosition + (delta * fragBitangent));
+        float n_dx = amplitude * fnoise(fragPosition + (bumpOffset * fragTangent));
+        float n_dy = amplitude * fnoise(fragPosition + (bumpOffset * fragBitangent));
 
         vec3 pos = fragPosition * (radius + n);
-        vec3 pos_dx = (fragPosition + (delta * fragTangent)) * (radius + n_dx);
-        vec3 pos_dy = (fragPosition + (delta * fragBitangent)) * (radius + n_dy);
-        
-        // Calculate the object-space normal by taking differences between the
-        // normal vector and the perturbed normal vectors
+        vec3 pos_dx = (fragPosition + (bumpOffset * fragTangent)) * (radius + n_dx);
+        vec3 pos_dy = (fragPosition + (bumpOffset * fragBitangent)) * (radius + n_dy);
+
         vec3 adjNormal = mix(fragNormal, normalize(cross(pos_dx - pos, pos_dy - pos)), bumpStrength * vec3(1));
 
-        float light = max(0.05, dot(adjNormal, lightDir));
+        float light = sunIntensity * max(0.05, dot(adjNormal, sunDirection));
 
         vec3 grassToMountains = mix(
           landColor, 
@@ -289,15 +288,17 @@
             n
         ));
 
-        gl_FragColor = vec4(light * mix(
+        vec3 terrainColor = mix(
           oceanColor, 
           sandToGrass, 
           smoothstep(
             thresholds.x - transitions.x, 
             thresholds.x + transitions.x, 
-            n)), 1.0);
+            n));
+
+        gl_FragColor = vec4(light * terrainColor * sunColor, 1.0);
       }
-    </script>
+  </script>
   <script type="module" src="/scripts/main.js"></script>
 </body>
 
