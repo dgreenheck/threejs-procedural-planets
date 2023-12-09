@@ -11,293 +11,330 @@
 
 <body>
   <div id="app"></div>
-  <script type="x-shader/x-vertex" id="planet-vert-shader">
-      attribute vec3 tangent;
 
-      uniform float seed;
-      uniform float radius;
+  <!-- SHADERS -->
+  <script type="x-shader/x-vertex" id="noise-functions">
+    const float PI = 3.14159265;
 
-      uniform float bumpStrength;
-      uniform float bumpOffset;
-      uniform float amplitude;
-      uniform float period;
-      uniform float persistence;
-      uniform float lacunarity;
-      uniform int octaves;
+    //	Simplex 3D Noise 
+    //	by Ian McEwan, Ashima Arts
+    //
+    vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+    vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
 
-      varying vec3 fragPosition;
-      varying vec3 fragNormal;
-      varying vec3 fragTangent;
-      varying vec3 fragBitangent;
-
-      const float PI = 3.14159265;
-
-      //	Simplex 3D Noise 
-      //	by Ian McEwan, Ashima Arts
-      //
-      vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-      vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
-
-      float snoise(vec3 v){ 
-        const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
-        const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+    float snoise(vec3 v) { 
+      const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+      const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
       // First corner
-        vec3 i  = floor(v + dot(v, C.yyy) );
-        vec3 x0 =   v - i + dot(i, C.xxx) ;
+      vec3 i  = floor(v + dot(v, C.yyy) );
+      vec3 x0 =   v - i + dot(i, C.xxx) ;
 
       // Other corners
-        vec3 g = step(x0.yzx, x0.xyz);
-        vec3 l = 1.0 - g;
-        vec3 i1 = min( g.xyz, l.zxy );
-        vec3 i2 = max( g.xyz, l.zxy );
+      vec3 g = step(x0.yzx, x0.xyz);
+      vec3 l = 1.0 - g;
+      vec3 i1 = min( g.xyz, l.zxy );
+      vec3 i2 = max( g.xyz, l.zxy );
 
-        //  x0 = x0 - 0. + 0.0 * C 
-        vec3 x1 = x0 - i1 + 1.0 * C.xxx;
-        vec3 x2 = x0 - i2 + 2.0 * C.xxx;
-        vec3 x3 = x0 - 1. + 3.0 * C.xxx;
+      //  x0 = x0 - 0. + 0.0 * C 
+      vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+      vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+      vec3 x3 = x0 - 1. + 3.0 * C.xxx;
 
       // Permutations
-        i = mod(i, 289.0 ); 
-        vec4 p = permute( permute( permute( 
-                  i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-                + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
-                + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+      i = mod(i, 289.0 ); 
+      vec4 p = permute( permute( permute( 
+                i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+              + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+              + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
 
       // Gradients
       // ( N*N points uniformly over a square, mapped onto an octahedron.)
-        float n_ = 1.0/7.0; // N=7
-        vec3  ns = n_ * D.wyz - D.xzx;
+      float n_ = 1.0/7.0; // N=7
+      vec3  ns = n_ * D.wyz - D.xzx;
 
-        vec4 j = p - 49.0 * floor(p * ns.z *ns.z);  //  mod(p,N*N)
+      vec4 j = p - 49.0 * floor(p * ns.z *ns.z);  //  mod(p,N*N)
 
-        vec4 x_ = floor(j * ns.z);
-        vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
+      vec4 x_ = floor(j * ns.z);
+      vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
 
-        vec4 x = x_ *ns.x + ns.yyyy;
-        vec4 y = y_ *ns.x + ns.yyyy;
-        vec4 h = 1.0 - abs(x) - abs(y);
+      vec4 x = x_ *ns.x + ns.yyyy;
+      vec4 y = y_ *ns.x + ns.yyyy;
+      vec4 h = 1.0 - abs(x) - abs(y);
 
-        vec4 b0 = vec4( x.xy, y.xy );
-        vec4 b1 = vec4( x.zw, y.zw );
+      vec4 b0 = vec4( x.xy, y.xy );
+      vec4 b1 = vec4( x.zw, y.zw );
 
-        vec4 s0 = floor(b0)*2.0 + 1.0;
-        vec4 s1 = floor(b1)*2.0 + 1.0;
-        vec4 sh = -step(h, vec4(0.0));
+      vec4 s0 = floor(b0)*2.0 + 1.0;
+      vec4 s1 = floor(b1)*2.0 + 1.0;
+      vec4 sh = -step(h, vec4(0.0));
 
-        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
-        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+      vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+      vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
 
-        vec3 p0 = vec3(a0.xy,h.x);
-        vec3 p1 = vec3(a0.zw,h.y);
-        vec3 p2 = vec3(a1.xy,h.z);
-        vec3 p3 = vec3(a1.zw,h.w);
+      vec3 p0 = vec3(a0.xy,h.x);
+      vec3 p1 = vec3(a0.zw,h.y);
+      vec3 p2 = vec3(a1.xy,h.z);
+      vec3 p3 = vec3(a1.zw,h.w);
 
       //Normalise gradients
-        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-        p0 *= norm.x;
-        p1 *= norm.y;
-        p2 *= norm.z;
-        p3 *= norm.w;
+      vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+      p0 *= norm.x;
+      p1 *= norm.y;
+      p2 *= norm.z;
+      p3 *= norm.w;
 
       // Mix final noise value
-        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-        m = m * m;
-        return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
-                                      dot(p2,x2), dot(p3,x3) ) );
+      vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+      m = m * m;
+      return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
+                                    dot(p2,x2), dot(p3,x3) ) );
+    }
+
+    float terrainHeight(
+      vec3 v,
+      float amplitude,
+      float sharpness,
+      float offset,
+      float period,
+      float persistence,
+      float lacunarity,
+      int octaves
+    ) {
+      float n = 0.0;
+      float a = 1.0; // Amplitude for current octave
+      float max_amp = 0.0; // Accumulate max amplitude so we can normalize after
+      float P = period;  // Period for current octave
+
+      for(int i = 0; i < octaves; i++) {
+          n += a * snoise(v / P);
+          a *= persistence;
+          max_amp += a;
+          P /= lacunarity;
       }
 
-      float fnoise(vec3 v) {
-        float n = 0.0;
-        float a = 1.0; // Amplitude for current octave
-        float max_amp = 0.0; // Accumulate max amplitude so we can normalize after
-        float P = period;  // Period for current octave
+      // Normalize noise between [0.0, amplitude]
+      n = max(0.0, amplitude * (n + 1.0) / 2.0 / max_amp);
 
-        for(int i = 0; i < octaves; i++) {
-            n += a * snoise(v / P);
-            a *= persistence;
-            max_amp += a;
-            P /= lacunarity;
-        }
+      // Raise amplitude to "sharpness" to make peaks more/less pronounced
+      n = pow(n, sharpness);
 
-        return amplitude * max(0.0, n / max_amp);
-      }
-
-      void main() {
-        float n = amplitude * fnoise(position);
-        vec3 pos = position * (radius + n);
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-        fragPosition = position;
-        fragNormal = normal;
-        fragTangent = tangent;
-        fragBitangent = cross(normal, tangent);
-      }
+      // Multiply by amplitude and adjust offset
+      return n + offset;
+    }
   </script>
+  <script type="x-shader/x-vertex" id="planet-vert-shader">
+    attribute vec3 tangent;
 
+    uniform float radius;
+    uniform float amplitude;
+    uniform float sharpness;
+    uniform float offset;
+    uniform float period;
+    uniform float persistence;
+    uniform float lacunarity;
+    uniform int octaves;
+
+    uniform float bumpStrength;
+    uniform float bumpOffset;
+
+    varying vec3 fragPosition;
+    varying vec3 fragNormal;
+    varying vec3 fragTangent;
+    varying vec3 fragBitangent;
+    
+    varying vec3 worldPosition;
+    varying vec3 worldNormal;
+
+    void main() {
+      // Calculate terrain height
+      float h = terrainHeight(
+        position,
+        amplitude, 
+        sharpness,
+        offset,
+        period, 
+        persistence, 
+        lacunarity, 
+        octaves);
+
+      vec3 pos = position * (radius + h);
+
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      fragPosition = position;
+      fragNormal = normal;
+      fragTangent = tangent;
+      fragBitangent = cross(normal, tangent);
+
+      worldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
+      worldNormal = (modelMatrix * vec4(normal, 1.0)).xyz;
+    }
+  </script>
   <script type="x-shader/x-fragment" id="planet-frag-shader">
-      uniform float seed;
+    // Terrain generation parameters
+    uniform float radius;
+    uniform float amplitude;
+    uniform float sharpness;
+    uniform float offset;
+    uniform float period;
+    uniform float persistence;
+    uniform float lacunarity;
+    uniform int octaves;
 
-      uniform float radius;
-      uniform float amplitude;
-      uniform float period;
-      uniform float persistence;
-      uniform float lacunarity;
-      uniform int octaves;
+    // Layer colors
+    uniform vec3 color1;
+    uniform vec3 color2;
+    uniform vec3 color3;
+    uniform vec3 color4;
+    uniform vec3 color5;
+    
+    // Transition points for each layer
+    uniform float transition2;
+    uniform float transition3;
+    uniform float transition4;
+    uniform float transition5;
 
-      uniform vec3 oceanColor;
-      uniform vec3 beachColor;
-      uniform vec3 landColor;
-      uniform vec3 mountainColor;
-      uniform vec3 thresholds;
-      uniform vec3 transitions;
+    // Amount of blending between each layer
+    uniform float blend12;
+    uniform float blend23;
+    uniform float blend34;
+    uniform float blend45;
 
-      uniform float bumpStrength;
-      uniform float bumpOffset;
+    // Bump mapping parameters
+    uniform float bumpStrength;
+    uniform float bumpOffset;
 
-      uniform vec3 sunDirection;
-      uniform vec3 sunColor;
-      uniform float sunIntensity;
+    // Lighting parameters
+    uniform float ambientIntensity;
+    uniform float diffuseIntensity;
+    uniform float specularIntensity;
+    uniform float shininess;
+    uniform vec3 lightDirection;
+    uniform vec3 lightColor;
 
-      varying vec3 fragPosition;
-      varying vec3 fragNormal;
-      varying vec3 fragTangent;
-      varying vec3 fragBitangent;
+    varying vec3 fragPosition;
+    varying vec3 fragNormal;
+    varying vec3 fragTangent;
+    varying vec3 fragBitangent;
 
-      const float PI = 3.14159265;
+    varying vec3 worldPosition;
+    varying vec3 worldNormal;
 
-      //	Simplex 3D Noise 
-      //	by Ian McEwan, Ashima Arts
-      //
-      vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
-      vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+    void main() {
+      // Calculate terrain height
+      float h = terrainHeight(
+        fragPosition,
+        amplitude, 
+        sharpness,
+        offset,
+        period, 
+        persistence, 
+        lacunarity, 
+        octaves);
 
-      float snoise(vec3 v) { 
-        const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
-        const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+      vec3 dx = bumpOffset * fragTangent;
+      float h_dx = terrainHeight(
+        fragPosition + dx,
+        amplitude, 
+        sharpness,
+        offset,
+        period, 
+        persistence, 
+        lacunarity, 
+        octaves);
 
-        // First corner
-        vec3 i  = floor(v + dot(v, C.yyy) );
-        vec3 x0 =   v - i + dot(i, C.xxx) ;
+      vec3 dy = bumpOffset * fragBitangent;
+      float h_dy = terrainHeight(
+        fragPosition + dy,
+        amplitude, 
+        sharpness,
+        offset,
+        period, 
+        persistence, 
+        lacunarity, 
+        octaves);
 
-        // Other corners
-        vec3 g = step(x0.yzx, x0.xyz);
-        vec3 l = 1.0 - g;
-        vec3 i1 = min( g.xyz, l.zxy );
-        vec3 i2 = max( g.xyz, l.zxy );
+      vec3 pos = fragPosition * (radius + h);
+      vec3 pos_dx = (fragPosition + dx) * (radius + h_dx);
+      vec3 pos_dy = (fragPosition + dy) * (radius + h_dy);
 
-        //  x0 = x0 - 0. + 0.0 * C 
-        vec3 x1 = x0 - i1 + 1.0 * C.xxx;
-        vec3 x2 = x0 - i2 + 2.0 * C.xxx;
-        vec3 x3 = x0 - 1. + 3.0 * C.xxx;
+      // Recalculate surface normal post-bump mapping
+      vec3 bumpNormal = normalize(cross(pos_dx - pos, pos_dy - pos));
+      // Mix original normal and bumped normal to control bump strength
+      vec3 N = normalize(mix(fragNormal, bumpNormal, bumpStrength));
+    
+      // Normalized light direction (points in direction that light travels)
+      vec3 L = normalize(-lightDirection);
+      // View vector from camera to fragment
+      vec3 V = normalize(cameraPosition - pos);
+      // Reflected light vector
+      vec3 R = normalize(reflect(L, N));
 
-        // Permutations
-        i = mod(i, 289.0 ); 
-        vec4 p = permute( permute( permute( 
-                  i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-                + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
-                + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+      float diffuse = diffuseIntensity * max(0.0, dot(N, -L));
 
-        // Gradients
-        // ( N*N points uniformly over a square, mapped onto an octahedron.)
-        float n_ = 1.0/7.0; // N=7
-        vec3  ns = n_ * D.wyz - D.xzx;
+      // https://ogldev.org/www/tutorial19/tutorial19.html
+      float specularFalloff = clamp((transition3 - h) / transition3, 0.0, 1.0);
+      float specular = max(0.0, specularFalloff * specularIntensity * pow(dot(V, R), shininess));
 
-        vec4 j = p - 49.0 * floor(p * ns.z *ns.z);  //  mod(p,N*N)
+      float light = ambientIntensity + diffuse + specular;
 
-        vec4 x_ = floor(j * ns.z);
-        vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
+      // Blender colors layer by layer
+      vec3 color12 = mix(
+        color1, 
+        color2, 
+        smoothstep(transition2 - blend12, transition2 + blend12, h));
 
-        vec4 x = x_ *ns.x + ns.yyyy;
-        vec4 y = y_ *ns.x + ns.yyyy;
-        vec4 h = 1.0 - abs(x) - abs(y);
+      vec3 color123 = mix(
+        color12, 
+        color3, 
+        smoothstep(transition3 - blend23, transition3 + blend23, h));
 
-        vec4 b0 = vec4( x.xy, y.xy );
-        vec4 b1 = vec4( x.zw, y.zw );
+      vec3 color1234 = mix(
+        color123, 
+        color4, 
+        smoothstep(transition4 - blend34, transition4 + blend34, h));
 
-        vec4 s0 = floor(b0)*2.0 + 1.0;
-        vec4 s1 = floor(b1)*2.0 + 1.0;
-        vec4 sh = -step(h, vec4(0.0));
+      vec3 finalColor = mix(
+        color1234, 
+        color5, 
+        smoothstep(transition5 - blend45, transition5 + blend45, h));
+      
+      gl_FragColor = vec4(light * finalColor * lightColor, 1.0);
+    }
+  </script>
+  <script type="x-shader/x-vertex" id="atmosphere-vert-shader">
+    attribute float size;
 
-        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
-        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+    varying vec3 fragPosition;
 
-        vec3 p0 = vec3(a0.xy,h.x);
-        vec3 p1 = vec3(a0.zw,h.y);
-        vec3 p2 = vec3(a1.xy,h.z);
-        vec3 p3 = vec3(a1.zw,h.w);
+    void main() {
+      gl_PointSize = size;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      fragPosition = position;
+    }
+  </script>
+  <script type="x-shader/x-fragment" id="atmosphere-frag-shader">
+    uniform float time;
+    uniform float speed;
+    uniform float density;
+    uniform float scale;
 
-        //Normalise gradients
-        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-        p0 *= norm.x;
-        p1 *= norm.y;
-        p2 *= norm.z;
-        p3 *= norm.w;
+    uniform vec3 lightDirection;
+    
+    uniform vec3 color;
+    uniform sampler2D pointTexture;
 
-        // Mix final noise value
-        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-        m = m * m;
-        return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
-                                      dot(p2,x2), dot(p3,x3) ) );
-      }
+    varying vec3 fragPosition;
 
-      float fnoise(vec3 v) {
-        float n = 0.0;
-        float a = 1.0; // Amplitude for current octave
-        float max_amp = 0.0; // Accumulate max amplitude so we can normalize after
-        float P = period;  // Period for current octave
+    void main() {
+      vec3 R = normalize(fragPosition);
+      vec3 L = normalize(lightDirection);
+      float light = max(0.1, dot(R, L));
 
-        for(int i = 0; i < octaves; i++) {
-            n += a * snoise(v / P);
-            a *= persistence;
-            max_amp += a;
-            P /= lacunarity;
-        }
-
-        return amplitude * max(0.0, n / max_amp);
-      }
-
-      void main() {
-        float n = amplitude * fnoise(fragPosition);
-        float n_dx = amplitude * fnoise(fragPosition + (bumpOffset * fragTangent));
-        float n_dy = amplitude * fnoise(fragPosition + (bumpOffset * fragBitangent));
-
-        vec3 pos = fragPosition * (radius + n);
-        vec3 pos_dx = (fragPosition + (bumpOffset * fragTangent)) * (radius + n_dx);
-        vec3 pos_dy = (fragPosition + (bumpOffset * fragBitangent)) * (radius + n_dy);
-
-        vec3 adjNormal = mix(fragNormal, normalize(cross(pos_dx - pos, pos_dy - pos)), bumpStrength * vec3(1));
-
-        float light = sunIntensity * max(0.05, dot(adjNormal, sunDirection));
-
-        vec3 grassToMountains = mix(
-          landColor, 
-          mountainColor, 
-          smoothstep(
-            thresholds.z - transitions.z, 
-            thresholds.z + transitions.z, 
-            n
-        ));
-
-        vec3 sandToGrass = mix(
-          beachColor, 
-          grassToMountains, 
-          smoothstep(
-            thresholds.y - transitions.y, 
-            thresholds.y + transitions.y, 
-            n
-        ));
-
-        vec3 terrainColor = mix(
-          oceanColor, 
-          sandToGrass, 
-          smoothstep(
-            thresholds.x - transitions.x, 
-            thresholds.x + transitions.x, 
-            n));
-
-        gl_FragColor = vec4(light * terrainColor * sunColor, 1.0);
-      }
+      float n = snoise((time * speed) + fragPosition / scale);
+      float alpha = clamp(n * density, 0.0, 1.0);
+      gl_FragColor = vec4(light * color, alpha) * texture2D(pointTexture, gl_PointCoord);
+    }
   </script>
   <script type="module" src="/scripts/main.js"></script>
 </body>
