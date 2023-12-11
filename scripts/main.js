@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import Stats from 'three/examples/jsm/libs/stats.module'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -9,15 +10,16 @@ import { Atmosphere } from './atmosphere';
 
 window.onload = () => loadScene();
 
-const uniforms = {
+const planetParams = {
   radius: { value: 20.0 },
   amplitude: { value: 1.19 },
-  sharpness: { value: 2.296 },
+  sharpness: { value: 2.6 },
   offset: { value: -0.016 },
   period: { value: 0.6 },
   persistence: { value: 0.484 },
-  lacunarity: { value: 1.648 },
-  octaves: { value: 8 },
+  lacunarity: { value: 1.8 },
+  octaves: { value: 10 },
+  undulation: { value: 0.0 },
   ambientIntensity: { value: 0.02 },
   diffuseIntensity: { value: 1 },
   specularIntensity: { value: 2 },
@@ -41,8 +43,25 @@ const uniforms = {
   blend45: { value: 0.168 }
 }
 
+const atmosphereParams = {
+  particles: { value: 4000 },
+  minParticleSize: { value: 50 },
+  maxParticleSize: { value: 100 },
+  radius: { value: planetParams.radius.value + 1 },
+  thickness: { value: 1.5 },
+  density: { value: 0 },
+  opacity: { value: 0.35 },
+  scale: { value: 8 },
+  color: { value: new THREE.Color(0xffffff) },
+  speed: { value: 0.03 },
+  lightDirection: planetParams.lightDirection
+};
+
 function loadScene() {
   console.log('loading scene');
+
+  const stats = new Stats()
+  document.body.appendChild(stats.dom)
 
   const clock = new THREE.Clock(true);
 
@@ -67,8 +86,9 @@ function loadScene() {
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableZoom = false;
+  controls.enablePan = false;
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.1;
+  controls.autoRotateSpeed = 0.2;
   camera.position.z = 50;
 
   const composer = new EffectComposer(renderer);
@@ -90,7 +110,7 @@ function loadScene() {
   const fragmentShader = document.getElementById('planet-frag-shader').innerHTML;
 
   const material = new THREE.ShaderMaterial({
-    uniforms,
+    uniforms: planetParams,
     vertexShader: vertexShader.replace(
       'void main() {',
       `${noiseFunctions}
@@ -107,19 +127,7 @@ function loadScene() {
   planet.geometry.computeTangents();
   scene.add(planet);
 
-  const atmosphere = new Atmosphere({
-    particles: 5000,
-    minParticleSize: 50,
-    maxParticleSize: 100,
-    radius: uniforms.radius.value + 1,
-    thickness: 0.8,
-    density: 0.2,
-    scale: 14,
-    color: new THREE.Color(0xffffff),
-    speed: 0.03,
-    lightDirection: uniforms.lightDirection
-  });
-
+  const atmosphere = new Atmosphere(atmosphereParams);
   planet.add(atmosphere);
 
   function animate() {
@@ -128,6 +136,7 @@ function loadScene() {
     atmosphere.rotation.y += 0.0002;
     controls.update();
     composer.render();
+    stats.update();
   }
 
   // Events
@@ -138,7 +147,7 @@ function loadScene() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  createUI(uniforms, atmosphere, bloomPass);
+  createUI(planetParams, atmosphereParams, atmosphere, bloomPass);
   animate();
 
   console.log('done');

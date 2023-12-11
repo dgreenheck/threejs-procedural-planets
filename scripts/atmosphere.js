@@ -1,26 +1,9 @@
 import * as THREE from 'three';
-import { SimplexNoise } from "three/examples/jsm/math/SimplexNoise"
 
 const texLoader = new THREE.TextureLoader();
 const cloudTex = texLoader.load('/cloud.png');
 
 export class Atmosphere extends THREE.Points {
-  
-  /**
-   * 
-   * @param {{
-   *   particles: number, 
-   *   minParticleSize: number,
-   *   maxParticleSize: number,
-   *   radius: number,
-   *   thickness: number,
-   *   density: number,
-   *   speed: number,
-   *   color: THREE.Color,
-   *   opacity: float,
-   *   lightDirection: THREE.Vector3
-   * }} params 
-   */
   constructor(params) {
     super();
 
@@ -33,12 +16,8 @@ export class Atmosphere extends THREE.Points {
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
-        color: { value: params.color },
-        density: { value: this.params.density },
-        scale: { value: this.params.scale },
-        speed: { value: this.params.speed },
         pointTexture: { value: cloudTex },
-        lightDirection: params.lightDirection
+        ...params
       },
       vertexShader,
       fragmentShader: fragmentShader.replace(
@@ -46,7 +25,7 @@ export class Atmosphere extends THREE.Points {
         `${noiseFunctions}
          void main() {`
       ),
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       depthWrite: false,
       transparent: true
     });
@@ -67,8 +46,8 @@ export class Atmosphere extends THREE.Points {
     const sizes = [];
     
     // Sample points within the atmosphere
-    for(let i = 0; i < this.params.particles; i++) {
-      let r = Math.random() * this.params.thickness + this.params.radius;
+    for(let i = 0; i < this.params.particles.value; i++) {
+      let r = Math.random() * this.params.thickness.value + this.params.radius.value;
 
       // Pick a random point within a cube of size [-1, 1]
       // This approach works better than parameterizing the spherical coordinates
@@ -83,7 +62,9 @@ export class Atmosphere extends THREE.Points {
       p.normalize();
       p.multiplyScalar(r);
 
-      const size = Math.random() * (this.params.maxParticleSize - this.params.minParticleSize) + this.params.minParticleSize;
+      const minSize = this.params.minParticleSize.value;
+      const maxSize = this.params.maxParticleSize.value;
+      const size = Math.random() * (maxSize - minSize) + minSize;
 
       verts.push(p.x, p.y, p.z);
       uvs.push(new THREE.Vector2(0.5, 0.5));
