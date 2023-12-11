@@ -73,7 +73,6 @@ function loadScene() {
 
   // https://opengameart.org/content/night-sky-skybox-generator
   scene.background = new THREE.CubeTextureLoader()
-    .setPath( '/' )
     .load( [
           'xpos.png',
           'xneg.png',
