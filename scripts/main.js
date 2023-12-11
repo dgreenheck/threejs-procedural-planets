@@ -11,6 +11,7 @@ import { Atmosphere } from './atmosphere';
 window.onload = () => loadScene();
 
 const planetParams = {
+  type: { value: 2 },
   radius: { value: 20.0 },
   amplitude: { value: 1.19 },
   sharpness: { value: 2.6 },

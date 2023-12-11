@@ -22,7 +22,8 @@
     vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
     vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
 
-    float snoise(vec3 v) { 
+    // 
+    float simplex3(vec3 v) { 
       const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
       const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
@@ -91,11 +92,9 @@
                                     dot(p2,x2), dot(p3,x3) ) );
     }
 
-    float terrainHeight(
+    float fractal3(      
       vec3 v,
-      float amplitude,
       float sharpness,
-      float offset,
       float period,
       float persistence,
       float lacunarity,
@@ -107,25 +106,60 @@
       float P = period;  // Period for current octave
 
       for(int i = 0; i < octaves; i++) {
-          n += a * snoise(v / P);
+          n += a * simplex3(v / P);
           a *= persistence;
           max_amp += a;
           P /= lacunarity;
       }
 
       // Normalize noise between [0.0, amplitude]
-      n = max(0.0, amplitude * (n + 1.0) / 2.0 / max_amp);
+      return n / max_amp;
+    }
 
-      // Raise amplitude to "sharpness" to make peaks more/less pronounced
-      n = pow(n, sharpness);
+    float terrainHeight(
+      int type,
+      vec3 v,
+      float amplitude,
+      float sharpness,
+      float offset,
+      float period,
+      float persistence,
+      float lacunarity,
+      int octaves
+    ) {
+      float h = 0.0;
+
+      if (type == 1) {
+        h = amplitude * simplex3(v / period);
+      } else if (type == 2) {
+        h = amplitude * fractal3(
+          v,
+          sharpness,
+          period, 
+          persistence, 
+          lacunarity, 
+          octaves);
+        h = amplitude * pow(max(0.0, (h + 1.0) / 2.0), sharpness);
+      } else if (type == 3) {
+        h = fractal3(
+          v,
+          sharpness,
+          period, 
+          persistence, 
+          lacunarity, 
+          octaves);
+        h = amplitude * pow(max(0.0, 1.0 - abs(h)), sharpness);
+      }
 
       // Multiply by amplitude and adjust offset
-      return max(0.0, n + offset);
+      return max(0.0, h + offset);
     }
   </script>
   <script type="x-shader/x-vertex" id="planet-vert-shader">
     attribute vec3 tangent;
 
+    // Terrain generation parameters
+    uniform int type;
     uniform float radius;
     uniform float amplitude;
     uniform float sharpness;
@@ -135,6 +169,7 @@
     uniform float lacunarity;
     uniform int octaves;
 
+    // Bump mapping
     uniform float bumpStrength;
     uniform float bumpOffset;
 
@@ -146,6 +181,7 @@
     void main() {
       // Calculate terrain height
       float h = terrainHeight(
+        type,
         position,
         amplitude, 
         sharpness,
@@ -166,6 +202,7 @@
   </script>
   <script type="x-shader/x-fragment" id="planet-frag-shader">
     // Terrain generation parameters
+    uniform int type;
     uniform float radius;
     uniform float amplitude;
     uniform float sharpness;
@@ -214,6 +251,7 @@
     void main() {
       // Calculate terrain height
       float h = terrainHeight(
+        type,
         fragPosition,
         amplitude, 
         sharpness,
@@ -225,6 +263,7 @@
 
       vec3 dx = bumpOffset * fragTangent;
       float h_dx = terrainHeight(
+        type,
         fragPosition + dx,
         amplitude, 
         sharpness,
@@ -236,6 +275,7 @@
 
       vec3 dy = bumpOffset * fragBitangent;
       float h_dy = terrainHeight(
+        type,
         fragPosition + dy,
         amplitude, 
         sharpness,
@@ -331,7 +371,7 @@
       vec3 L = normalize(lightDirection);
       float light = max(0.05, dot(R, L));
 
-      float n = snoise((time * speed) + fragPosition / scale);
+      float n = simplex3((time * speed) + fragPosition / scale);
       float alpha = opacity * clamp(n + density, 0.0, 1.0);
 
       vec2 rotCoords = rotateUV(gl_PointCoord, n);

@@ -4,8 +4,9 @@ export default function createUI(planetParams, atmosphereParams, atmosphere, blo
   const gui = new GUI();
 
   const terrainFolder = gui.addFolder('Terrain');
+  terrainFolder.add(planetParams.type, 'value', { simplex: 1, fractal: 2, ridgedFractal: 3 }).name('Type');
   terrainFolder.add(planetParams.amplitude, 'value', 0.1, 1.5).name('Amplitude');
-  terrainFolder.add(planetParams.sharpness, 'value', 1, 5).name('Sharpness');
+  terrainFolder.add(planetParams.sharpness, 'value', 0, 5).name('Sharpness');
   terrainFolder.add(planetParams.offset, 'value', -2, 2).name('Offset');
   terrainFolder.add(planetParams.period, 'value', 0.1, 2).name('Period');
   terrainFolder.add(planetParams.persistence, 'value', 0, 1).name('Persistence');
