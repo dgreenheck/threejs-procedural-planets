@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const texLoader = new THREE.TextureLoader();
-const cloudTex = texLoader.load('/cloud.png');
+const cloudTex = texLoader.load('cloud.png');
 
 export class Atmosphere extends THREE.Points {
   constructor(params) {
